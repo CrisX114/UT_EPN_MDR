@@ -17,12 +17,12 @@
 /********************** Definicion de constantes **********************/
 
 /*  Define el API Key */
-#define API_KEY "AIzaSyCv2KOp4wX-OSVe1uJ8LgX_by0m7dKa1vw"
+#define API_KEY ""
 /* Define el project ID */
-#define FIREBASE_PROJECT_ID "sca-cdici"
+#define FIREBASE_PROJECT_ID ""
 /* Define el email y contraseña del usuario existente */
-#define USER_EMAIL "cristhian.xavier4@gmail.com"
-#define USER_PASSWORD "cris12345"
+#define USER_EMAIL ""
+#define USER_PASSWORD ""
 
 /* Definición de constantes para pulsadores, sensor y cantidad de usuarios */
 #define NUM_MAX_REGISTRO 20
@@ -61,6 +61,7 @@ struct Registro{
   String asistencia;
   String temperatura;
   String usuario;
+  String horario;
   int numRegistro;
   String hora;
   String horasTrabajadas;
@@ -144,7 +145,7 @@ bool generarRegistroDiario = true;
 bool puedeActualizarFechaHora = false;
 
 /* Array tipo de asistencia */
-const String tipoDeAsistencia [3] = {"PRESENTE", "ATRASO", "FALTA", "DIA EXTRA"};
+const String tipoDeAsistencia [4] = {"PRESENTE", "ATRASO", "FALTA", "DIA EXTRA"};
 /* Array para datos de Usuario */
 Usuario usuarios[NUM_USUARIOS];
 /* Tiempo de reinicio en milisegundos */
@@ -736,6 +737,7 @@ Registro getRegistro(int numeroRegistro, Usuario user, Fecha fechaHoy, bool esFa
   registro.idUsuario = user.id;
   registro.numRegistro = numeroRegistro;
   registro.usuario = user.nombreUsuario;
+  registro.horario = user.horasDeTrabajo;
   registro.hora = fechaHoy.timeToSet.timestamp(DateTime::TIMESTAMP_FULL)+"Z";
   if(numeroRegistro % 2 == 0){
     String temperatura;
@@ -801,6 +803,8 @@ String guardarRegistroFirebase(Registro registro){
       content.set("fields/asistencia/arrayValue/values/[0]/stringValue", registro.asistencia);
       //horas trabajadas
       content.set("fields/horasTrabajadas/stringValue", registro.horasTrabajadas);
+      //horas trabajadas
+      content.set("fields/horario/stringValue", registro.horario);
       //hora
       String arraySet = "fields/hora/arrayValue/values/[0]/timestampValue";
       content.set(arraySet, registro.hora);
@@ -856,7 +860,7 @@ String guardarRegistroSinInternet(Registro registro){
     String documentPath = registro.path;
     registrosS = " " + String(registro.numRegistro) +"_" + registro.id.substring(0,8) + "_" + registro.idUsuario + "_" + registro.hora;
     if(registro.numRegistro == 0){
-      registrosS = registrosS + "_" + registro.horasTrabajadas + "_" + registro.usuario+ "_" + registro.temperatura + "_" + registro.asistencia;
+      registrosS = registrosS + "_" + registro.horario + "_" +registro.horasTrabajadas + "_" + registro.usuario+ "_" + registro.temperatura + "_" + registro.asistencia;
     } else if(registro.numRegistro %2 == 0){
       registrosS = registrosS + "_" + registro.temperatura;
     } else {
@@ -897,10 +901,11 @@ bool cargarRegistrosFaltantesFirebase(){
       registro.id = fecha + registro.idUsuario;
       registro.hora = getSubCadena(buffer,'_',3);
       if(registro.numRegistro == 0){
-        registro.horasTrabajadas = getSubCadena(buffer,'_',4);
-        registro.usuario = getSubCadena(buffer,'_',5);
-        registro.temperatura = getSubCadena(buffer,'_',6);
-        registro.asistencia = getSubCadena(buffer,'_',7);
+        registro.horario = getSubCadena(buffer,'_',4);
+        registro.horasTrabajadas = getSubCadena(buffer,'_',5);
+        registro.usuario = getSubCadena(buffer,'_',6);
+        registro.temperatura = getSubCadena(buffer,'_',7);
+        registro.asistencia = getSubCadena(buffer,'_',8);
         registro.asistencia = registro.asistencia.substring(0,registro.asistencia.length()-1);
       } else if(registro.numRegistro %2 == 0){
         registro.temperatura = getSubCadena(buffer,'_',4);
@@ -960,7 +965,7 @@ String generarEstadoAsistencia(int numRegistro, Fecha hoy, String horario , bool
   int minutos = getSubCadena(horario,':',1).toInt();
   int horaUsuario = hora*10000;
   int horaRegistrada = atoi(hoy.hora);
-  if(hoy.dayOfTheWeek() == 0 || hoy.dayOfTheWeek() == 6){
+  if(hoy.hoy.dayOfTheWeek() == 0 || hoy.hoy.dayOfTheWeek() == 6){
     return tipoDeAsistencia[3];
   }
   if(esFalta) return tipoDeAsistencia[2];
@@ -991,7 +996,7 @@ void leerPreferencias(){
     transform_write.type = fb_esp_firestore_document_write_type_transform;
 
     //Establecer la ruta del documento del documento para escribir (transformar)
-    transform_write.document_transform.transform_document_path = "preferencias/system";
+    transform_write.document_transform.transform_document_path = "preferencias/sistema";
 
     //Establecer una transformación de un campo del documento.
     struct fb_esp_firestore_document_write_field_transforms_t field_transforms;
@@ -1016,7 +1021,7 @@ void leerPreferencias(){
     else
         Serial.println(fbdo.errorReason());
         
-    String collectionId = "preferencias/system";
+    String collectionId = "preferencias/sistema";
     String mask = "numeroDeHuellasRegistradas,toleranciaIn,timeServer,horaRegistroFaltas";
     
     Serial.print("Listando los documentos en la colección: preferencias");
@@ -1090,7 +1095,7 @@ void leerOpciones(){
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Leyendo BaseDeDatos");
-    String collectionId = "preferencias/system";
+    String collectionId = "preferencias/sistema";
     String buffer;
     String mensaje;
     Serial.println("Listando los documentos de la coleeción... ");
@@ -1142,7 +1147,7 @@ void leerOpciones(){
               lcd.clear();
               lcd.setCursor(0,1); lcd.print("Actualizando datos");
               
-              String documentPath = "preferencias/system";
+              String documentPath = "preferencias/sistema";
               content.set("fields/idHuellaAccion/integerValue", 0);
               content.set("fields/puedeActualizar/booleanValue", false);
               actualizarDocumentoFirebase (content, collectionId, "idHuellaAccion,puedeActualizar");
@@ -1169,7 +1174,7 @@ void leerOpciones(){
           if(eliminarHuellaDigital(idHuellaAccion)){
             lcd.clear();
             lcd.setCursor(0,1); lcd.print("Actualizando datos");
-            String documentPath = "preferencias/system";
+            String documentPath = "preferencias/sistema";
             content.set("fields/idHuellaAccion/integerValue", 0); 
             content.set("fields/puedeEliminar/booleanValue", false); 
             actualizarDocumentoFirebase (content, collectionId, "idHuellaAccion,puedeEliminar");  
